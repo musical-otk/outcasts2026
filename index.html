@@ -2,7 +2,7 @@
 <html lang="ko" data-theme="light">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <title>✈ ROGER 관극 다이어리</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#3B6FE8">
@@ -31,14 +31,18 @@
     background: var(--bg); color: var(--text);
     max-width: 480px; margin: 0 auto; min-height: 100vh;
   }
-  #app { padding-bottom: var(--tab-h); }
+  #app { padding-bottom: calc(var(--tab-h) + env(safe-area-inset-bottom, 0px)); }
 
   /* TAB BAR */
   .tab-bar {
-    position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
-    width: 100%; max-width: 480px; height: var(--tab-h);
+    position: fixed; bottom: 0; left: 0;
+    width: 100%;
+    height: calc(var(--tab-h) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
     background: var(--bg2); border-top: 1px solid var(--border);
-    display: flex; z-index: 100;
+    display: flex; z-index: 100; box-sizing: border-box;
   }
   .tab-btn {
     flex: 1; display: flex; flex-direction: column;
@@ -118,14 +122,14 @@
   .cal-month { font-size: 18px; font-weight: 700; }
   .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
   .cal-dow { text-align: center; font-size: 11px; color: var(--text3); padding: 6px 0; font-weight: 600; }
-  .cal-event-rows { position: relative; }
-  .cal-event-row { position: relative; height: 20px; margin-top: 1px; }
+  .cal-week-wrap { position: relative; }
+  .cal-event-overlay { position: absolute; top: 0; left: 0; right: 0; pointer-events: none; z-index: 1; }
+  .cal-event-row { position: relative; height: 16px; margin-bottom: 1px; }
   .cal-event-bar-full {
-    position: absolute; height: 18px; border-radius: 4px; top: 1px;
-    display: flex; align-items: center; padding: 0 6px;
-    font-size: 10px; font-weight: 600; color: #fff;
+    position: absolute; height: 14px; border-radius: 3px; top: 1px;
+    display: flex; align-items: center; padding: 0 4px;
+    font-size: 9px; font-weight: 600; color: #fff;
     overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-    pointer-events: none;
   }
   .cal-day { min-height: 42px; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; padding: 4px 3px 3px; border-radius: 6px; cursor: pointer; position: relative; transition: background 0.15s; overflow: hidden; }
   .cal-day:hover { background: var(--bg3); }
@@ -1522,22 +1526,8 @@ function renderCalendar() {
   let html = `<div class="cal-grid">${dow.map(d=>`<div class="cal-dow">${d}</div>`).join('')}</div>`;
 
   for (let w = 0; w < weeks; w++) {
-    // 이벤트 행 (최대 3줄)
     const wSegs = segments.filter(s => s.week === w);
     const maxRow = wSegs.length ? Math.max(...wSegs.map(s => s.row)) + 1 : 0;
-    if (maxRow > 0) {
-      html += '<div class="cal-event-rows">';
-      for (let row = 0; row < maxRow; row++) {
-        html += '<div class="cal-event-row">';
-        wSegs.filter(s => s.row === row).forEach(s => {
-          const leftPct  = (s.startCol/7*100).toFixed(2);
-          const widthPct = ((s.endCol-s.startCol+1)/7*100).toFixed(2);
-          html += `<div class="cal-event-bar-full" style="left:${leftPct}%;width:calc(${widthPct}% - 2px);background:${s.color};">${s.name}</div>`;
-        });
-        html += '</div>';
-      }
-      html += '</div>';
-    }
 
     // 날짜 행
     html += '<div class="cal-grid">';
@@ -1560,11 +1550,30 @@ function renderCalendar() {
       else if (dow2 === 6)      cls += ' sat';
       if (ds === calSelectedDs) cls += ' selected';
 
-      // 필터 여부와 관계없이 해당 회차 표시 (필터 있으면 필터 기준, 없으면 전체)
-      const displaySch = filteredDaySch;
+      // 이 날짜에 걸리는 이벤트 (row별로)
+      const dayCell = w*7+col;
+      let evHtml = '';
+      for (let row = 0; row < maxRow; row++) {
+        const seg = wSegs.find(s => s.row === row && s.startCol <= col && s.endCol >= col);
+        if (seg) {
+          // 바의 시작 셀에서만 텍스트 표시, 나머지는 색상 연장
+          const isStart = seg.startCol === col;
+          const isEnd   = seg.endCol   === col;
+          const radius  = isStart && isEnd ? '4px' : isStart ? '4px 0 0 4px' : isEnd ? '0 4px 4px 0' : '0';
+          const marginL = isStart ? '1px' : '0';
+          const marginR = isEnd   ? '1px' : '0';
+          evHtml += `<div style="height:15px;background:${seg.color};border-radius:${radius};margin:1px ${marginR} 0 ${marginL};display:flex;align-items:center;padding:0 ${isStart?'4px':'0'};overflow:hidden;">
+            ${isStart ? `<span style="font-size:9px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${seg.name}</span>` : ''}
+          </div>`;
+        } else {
+          evHtml += `<div style="height:15px;margin:1px 0 0;"></div>`;
+        }
+      }
+
+      // 회차
       let sessionHtml = '';
-      if (displaySch.length) {
-        sessionHtml = displaySch
+      if (filteredDaySch.length) {
+        sessionHtml = filteredDaySch
           .sort((a,b) => a.time.localeCompare(b.time))
           .map(s => {
             const key = `${ds}-${s.time}`;
@@ -1578,6 +1587,7 @@ function renderCalendar() {
 
       html += `<div class="${cls}" onclick="calDayClick('${ds}')">
         <span class="cal-day-num">${day}</span>
+        ${evHtml}
         ${sessionHtml}
       </div>`;
     }
