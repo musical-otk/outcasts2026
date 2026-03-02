@@ -325,7 +325,10 @@
   .home-coupon-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); }
   .home-coupon-row:last-child { border-bottom: none; }
   .home-coupon-name { font-size: 13px; color: var(--text2); }
-  .home-coupon-count { font-size: 18px; font-weight: 700; color: var(--accent); }
+  .home-coupon-nums { display: flex; align-items: baseline; gap: 2px; }
+  .home-coupon-cur  { font-size: 20px; font-weight: 700; color: var(--accent); }
+  .home-coupon-sep  { font-size: 13px; color: var(--text3); margin: 0 2px; }
+  .home-coupon-final{ font-size: 13px; font-weight: 600; color: var(--text3); }
 
   /* SCHEDULE FILTER CHIPS */
   .filter-wrap  { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; margin-bottom: 12px; }
@@ -1117,11 +1120,17 @@ function editRecord(id) {
   document.getElementById('rec-comment').value = r.comment||'';
   document.getElementById('rec-memo').value = r.memo||'';
   // isBooked: true by default; unconfirmed = !isBooked
-  document.getElementById('rec-unconfirmed').checked = !(r.isBooked !== false);
+  // isBooked === false 이면 미정 (명시적 false 비교)
+  document.getElementById('rec-unconfirmed').checked = r.isBooked === false;
   populateStampSelect();
-  // 수정 시 기존 도장판 선택값 복원 (수량은 1로 초기화 — 추가 찍기용)
+  // 도장판 + 수량 복원
   document.getElementById('rec-stamp-board').value = r.stampBoardId || '';
   onRecStampBoardChange();
+  // 저장된 stampQty 복원 (폼이 1로 초기화된 채 저장되면 잘못된 stampChanged 발생 방지)
+  if (r.stampBoardId && r.stampQty) {
+    const qtyEl = document.querySelector(`input[name="rec-stamp-qty"][value="${r.stampQty}"]`);
+    if (qtyEl) { qtyEl.checked = true; updateRecQtyLabel(); }
+  }
   setStar(r.rating||0);
   openPanel('overlay-record');
 }
@@ -1172,6 +1181,7 @@ function saveRecord() {
     price:        priceVal!=='' ? parseInt(priceVal) : null,
     discountType: discountType,
     stampBoardId: stampBoardId || null,
+    stampQty:     stampBoardId ? stampQty : null,
     rating:       currentStar,
     comment:      document.getElementById('rec-comment').value.trim(),
     memo:         document.getElementById('rec-memo').value.trim(),
@@ -1182,34 +1192,64 @@ function saveRecord() {
   if (editId) {
     records[records.findIndex(x=>x.id===editId)] = record;
     const prevStampBoardId = prevRecord?.stampBoardId || null;
-    const stampChanged = stampBoardId !== prevStampBoardId;
+    const prevStampQty     = prevRecord?.stampQty || 1;
+    const stampChanged = stampBoardId !== prevStampBoardId || stampQty !== prevStampQty;
 
     if (stampChanged) {
       const boards = getStampBoards();
+
+      // ① 이전 도장판에서 이 기록의 이력 제거 (recordId로 정확하게 매칭)
       if (prevStampBoardId) {
         const prevBoard = boards.find(b => b.id === prevStampBoardId);
         if (prevBoard && prevBoard.history) {
+          // recordId 매칭 우선, 없으면 date+method로 폴백
           const idx = prevBoard.history.map((h,i)=>({h,i})).reverse()
-            .find(({h}) => h.date === (prevRecord?.date || date));
+            .find(({h}) => h.recordId === editId || h.date === (prevRecord?.date || date));
           if (idx !== undefined) prevBoard.history.splice(idx.i, 1);
           recalcStampCount(prevBoard);
           revalidateMilestones(prevBoard);
         }
       }
+
+      // ② 새 도장판에 추가 — applyStampToBoard 활용 (마일스톤·할인권 처리 포함)
       if (stampBoardId) {
         const newBoard = boards.find(b => b.id === stampBoardId);
         if (newBoard) {
+          // 같은 도장판이면 마일스톤 notified 리셋 후 재계산
+          if (prevStampBoardId === stampBoardId) revalidateMilestones(newBoard);
           recalcStampCount(newBoard);
-          if (newBoard.currentCount < newBoard.totalSlots) {
-            const actualQty = Math.min(stampQty, newBoard.totalSlots - newBoard.currentCount);
+
+          const remaining = newBoard.totalSlots - newBoard.currentCount;
+          // 꽉 찬 보드면 덮어쓰기 방지 (totalSlots 초과 불가)
+          const actualQty = remaining > 0 ? Math.min(stampQty, remaining) : 0;
+          if (actualQty > 0) {
             const qtyLabel  = actualQty > 1 ? ' ×' + actualQty : '';
             if (!newBoard.history) newBoard.history = [];
-            newBoard.history.push({ date, method: `${skylar}×${didi} 관람 연동` + qtyLabel, comment: '', qty: actualQty });
-            recalcStampCount(newBoard);
-            if (!newBoard.milestones) newBoard.milestones = [{ at:3, reward:'50% 할인권', couponKey:'discount50', notified:false }];
-            newBoard.milestones.forEach(m => {
-              if (newBoard.currentCount >= m.at && !m.notified) m.notified = true;
+            newBoard.history.push({
+              recordId: editId,
+              date,
+              method: `${skylar}×${didi} 관람 연동` + qtyLabel,
+              comment: '',
+              qty: actualQty
             });
+            recalcStampCount(newBoard);
+
+            // 마일스톤 달성 시 할인권 적립
+            if (!newBoard.milestones) newBoard.milestones = [{ at:3, reward:'50% 할인권', couponKey:'discount50', notified:false }];
+            const editCoupons = getCoupons();
+            let couponChanged = false;
+            newBoard.milestones.forEach(m => {
+              if (newBoard.currentCount >= m.at && !m.notified) {
+                m.notified = true;
+                if (m.couponKey) {
+                  if (!editCoupons[m.couponKey]) editCoupons[m.couponKey] = { history: [] };
+                  if (!editCoupons[m.couponKey].history) editCoupons[m.couponKey].history = [];
+                  editCoupons[m.couponKey].history.push({ type:'획득', date, comment: '[' + newBoard.name + '] ' + newBoard.totalSlots + '칸 달성' });
+                  couponChanged = true;
+                }
+              }
+            });
+            if (couponChanged) saveCoupons(editCoupons);
           }
         }
       }
@@ -1220,6 +1260,13 @@ function saveRecord() {
     records.push(record);
     if (stampBoardId) {
       const toastMsg = applyStampToBoard(stampBoardId, stampQty, date, `${skylar}×${didi} 관람 연동`);
+      // 방금 추가된 history에 recordId 심기 (수정 시 정확한 삭제를 위해)
+      const boards2 = getStampBoards();
+      const board2  = boards2.find(b => b.id === stampBoardId);
+      if (board2 && board2.history && board2.history.length) {
+        board2.history[board2.history.length - 1].recordId = record.id;
+        saveStampBoards(boards2);
+      }
       showToast(toastMsg || '기록이 추가되었습니다');
     } else {
       showToast('기록이 추가되었습니다');
@@ -1259,8 +1306,10 @@ function openDetail(id) {
       const sorted = [...(board.history||[])].sort((a,z) => a.date.localeCompare(z.date));
       let cumulative = 0, seq = null;
       for (const h of sorted) {
-        const hQty = (h.method && h.method.match(/×(\d+)/)) ? parseInt(h.method.match(/×(\d+)/)[1]) : 1;
-        if (h.date === r.date && seq === null) seq = cumulative + 1;
+        // qty 필드 우선, 없으면 method ×N 파싱, 그것도 없으면 1
+        const hQty = h.qty != null ? h.qty : ((h.method && h.method.match(/×(\d+)/)) ? parseInt(h.method.match(/×(\d+)/)[1]) : 1);
+        const isThisRecord = h.recordId ? h.recordId === r.id : h.date === r.date;
+        if (isThisRecord && seq === null) seq = cumulative + 1;
         cumulative += hQty;
       }
       if (seq === null) seq = board.currentCount;
@@ -1288,6 +1337,10 @@ function buildMiniSeat(zone, row, num) {
         const emptyCnt = z === 'B' ? (r===0?12:13) : 4;
         for (let i=0; i<emptyCnt; i++) zHtml[z] += '<div class="mini-seat-cell" style="visibility:hidden;"></div>';
       } else {
+        // B구역 0열은 12칸 — 1~13열(13칸)과 정렬 맞추기 위해 앞에 빈 셀 1개 추가
+        if (z === 'B' && r === 0) {
+          zHtml[z] += `<div class="mini-seat-cell" style="visibility:hidden;"></div>`;
+        }
         for (let col=1; col<=c.cols(r); col++) {
           const hl = z===zone && r===parseInt(row) && col===parseInt(num);
           zHtml[z] += `<div class="mini-seat-cell${hl?' highlight':''}"></div>`;
@@ -1315,7 +1368,9 @@ function deleteCurrentRecord() {
     const boards = getStampBoards();
     const board  = boards.find(b => b.id === target.stampBoardId);
     if (board && board.history) {
-      const idx = board.history.map((h,i)=>({h,i})).reverse().find(({h}) => h.date === target.date);
+      // recordId 매칭 우선, 없으면 date 폴백
+      const idx = board.history.map((h,i)=>({h,i})).reverse()
+        .find(({h}) => h.recordId === target.id || h.date === target.date);
       if (idx !== undefined) board.history.splice(idx.i, 1);
       recalcStampCount(board);
       revalidateMilestones(board);
@@ -1406,13 +1461,38 @@ function renderHome() {
   // ④ 쿠폰
   const coupons = getCoupons();
   const todayStr = new Date().toISOString().slice(0, 10);
-  const c40  = calcCouponCount('discount40',   coupons, boards, records, todayStr);
-  const c50  = calcCouponCount('discount50',   coupons, boards, records, todayStr);
-  const cPas = calcCouponCount('discountPass', coupons, boards, records, todayStr);
+  // 잔여: 오늘까지 기준 / 최종: 미달성 milestone 포함 전체
+  function homeCouponFinal(key) {
+    const cur = calcCouponCount(key, coupons, boards, records);
+    const future = boards.reduce((sum, b) =>
+      sum + (b.milestones||[]).filter(m =>
+        (m.couponKey||'discount50') === key && !m.notified
+      ).length, 0);
+    return cur + future;
+  }
+  const c40    = calcCouponCount('discount40',   coupons, boards, records, todayStr);
+  const c50    = calcCouponCount('discount50',   coupons, boards, records, todayStr);
+  const cPas   = calcCouponCount('discountPass', coupons, boards, records, todayStr);
+  const f40    = homeCouponFinal('discount40');
+  const f50    = homeCouponFinal('discount50');
+  const fPas   = homeCouponFinal('discountPass');
+  function couponNumHtml(cur, final) {
+    return `<div class="home-coupon-nums">
+      <div style="text-align:center;">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:1px;">잔여</div>
+        <span class="home-coupon-cur">${cur}</span>
+      </div>
+      <span class="home-coupon-sep">/</span>
+      <div style="text-align:center;">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:1px;">최종</div>
+        <span class="home-coupon-final" style="font-size:20px;font-weight:700;color:var(--text2);">${final}</span>
+      </div>
+    </div>`;
+  }
   document.getElementById('home-coupons').innerHTML = `
-    <div class="home-coupon-row"><span class="home-coupon-name">🏷 40% 할인권</span><span class="home-coupon-count">${c40}</span></div>
-    <div class="home-coupon-row"><span class="home-coupon-name">🏷 50% 할인권</span><span class="home-coupon-count">${c50}</span></div>
-    <div class="home-coupon-row"><span class="home-coupon-name">🎟 할인 증빙 PASS</span><span class="home-coupon-count">${cPas}</span></div>`;
+    <div class="home-coupon-row"><span class="home-coupon-name">🏷 40% 할인권</span>${couponNumHtml(c40,f40)}</div>
+    <div class="home-coupon-row"><span class="home-coupon-name">🏷 50% 할인권</span>${couponNumHtml(c50,f50)}</div>
+    <div class="home-coupon-row"><span class="home-coupon-name">🎟 할인 증빙 PASS</span>${couponNumHtml(cPas,fPas)}</div>`;
 
   // ⑤ 최근 관람 (이미 지난 것 또는 미정)
   const past = records
@@ -1528,16 +1608,17 @@ function renderCalendar() {
   for (let w = 0; w < weeks; w++) {
     const wSegs = segments.filter(s => s.week === w);
     const maxRow = wSegs.length ? Math.max(...wSegs.map(s => s.row)) + 1 : 0;
+    const evHeight = maxRow * 17; // 이벤트 행 높이 (셀 내 스페이서용)
 
-    // 날짜 행
-    html += '<div class="cal-grid">';
+    // ① 날짜 행 (날짜 숫자 + 이벤트 스페이서 + 회차)
+    html += '<div class="cal-grid" style="position:relative;">';
     for (let col = 0; col < 7; col++) {
       const cell = w*7+col;
       const day  = cell-firstDay+1;
       if (cell < firstDay || day > lastDate) { html += '<div class="cal-day empty"></div>'; continue; }
 
-      const ds     = `${monthStr}-${String(day).padStart(2,'0')}`;
-      const dow2   = new Date(calYear, calMonth, day).getDay();
+      const ds   = `${monthStr}-${String(day).padStart(2,'0')}`;
+      const dow2 = new Date(calYear, calMonth, day).getDay();
       const daySch = schByDate[ds] || [];
       const filteredDaySch = daySch.filter(s =>
         (!calFilterSky  || s.skylar === calFilterSky) &&
@@ -1550,27 +1631,6 @@ function renderCalendar() {
       else if (dow2 === 6)      cls += ' sat';
       if (ds === calSelectedDs) cls += ' selected';
 
-      // 이 날짜에 걸리는 이벤트 (row별로)
-      const dayCell = w*7+col;
-      let evHtml = '';
-      for (let row = 0; row < maxRow; row++) {
-        const seg = wSegs.find(s => s.row === row && s.startCol <= col && s.endCol >= col);
-        if (seg) {
-          // 바의 시작 셀에서만 텍스트 표시, 나머지는 색상 연장
-          const isStart = seg.startCol === col;
-          const isEnd   = seg.endCol   === col;
-          const radius  = isStart && isEnd ? '4px' : isStart ? '4px 0 0 4px' : isEnd ? '0 4px 4px 0' : '0';
-          const marginL = isStart ? '1px' : '0';
-          const marginR = isEnd   ? '1px' : '0';
-          evHtml += `<div style="height:15px;background:${seg.color};border-radius:${radius};margin:1px ${marginR} 0 ${marginL};display:flex;align-items:center;padding:0 ${isStart?'4px':'0'};overflow:hidden;">
-            ${isStart ? `<span style="font-size:9px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${seg.name}</span>` : ''}
-          </div>`;
-        } else {
-          evHtml += `<div style="height:15px;margin:1px 0 0;"></div>`;
-        }
-      }
-
-      // 회차
       let sessionHtml = '';
       if (filteredDaySch.length) {
         sessionHtml = filteredDaySch
@@ -1587,11 +1647,29 @@ function renderCalendar() {
 
       html += `<div class="${cls}" onclick="calDayClick('${ds}')">
         <span class="cal-day-num">${day}</span>
-        ${evHtml}
+        <div style="height:${evHeight}px;flex-shrink:0;"></div>
         ${sessionHtml}
       </div>`;
     }
-    html += '</div>';
+
+    // ② 이벤트 오버레이 — 날짜 숫자(약 20px) 바로 아래, 셀 그리드 위에 절대 위치
+    if (maxRow > 0) {
+      html += `<div style="position:absolute;top:20px;left:0;right:0;pointer-events:none;">`;
+      for (let row = 0; row < maxRow; row++) {
+        html += `<div style="position:relative;height:16px;margin-bottom:1px;">`;
+        wSegs.filter(s => s.row === row).forEach(s => {
+          const leftPct  = (s.startCol / 7 * 100).toFixed(2);
+          const widthPct = ((s.endCol - s.startCol + 1) / 7 * 100).toFixed(2);
+          html += `<div style="position:absolute;left:${leftPct}%;width:calc(${widthPct}% - 3px);height:14px;background:${s.color};border-radius:3px;display:flex;align-items:center;padding:0 4px;overflow:hidden;">
+            <span style="font-size:9px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.name}</span>
+          </div>`;
+        });
+        html += `</div>`;
+      }
+      html += `</div>`;
+    }
+
+    html += '</div>'; // cal-grid
   }
 
   document.getElementById('cal-wrap').innerHTML = html;
@@ -1758,6 +1836,10 @@ function renderHeatmap() {
       } else {
         const colCnt = z.cols(row);
         zHtml[z.name] += `<div class="seat-row"><div class="row-label">${row}열</div>`;
+        // B구역 0열은 12칸 — 1~13열(13칸)과 정렬 맞추기 위해 앞에 빈 셀 1개 추가
+        if (z.name === 'B' && row === 0) {
+          zHtml[z.name] += `<div class="seat-cell" style="visibility:hidden;"></div>`;
+        }
         for (let col = 1; col <= colCnt; col++) {
           const k   = `${z.name}-${row}-${col}`;
           const cnt = seatMap[k] || 0;
@@ -1966,14 +2048,16 @@ function renderStampHistoryPanel() {
     const origIdx = board.history.indexOf(h);
     const d = new Date(h.date + 'T00:00:00');
     const dateStr = `${h.date.slice(5).replace('-','.')}(${dow[d.getDay()]})`;
-    const displayMethod = (h.method||'').replace(' (수정)', '');
-    const qtyLabel = h.qty > 1 ? ` ×${h.qty}` : '';
+    // method에서 ×N 제거 후 qty 필드로 표시 (중복 방지)
+    const baseMethod = (h.method||'').replace(/\s*×\d+$/, '').replace(' (수정)', '');
+    const qty = h.qty || 1;
+    const qtyLabel = qty > 1 ? ` ×${qty}` : '';
     return `<div class="history-item">
       <div style="flex:1;">
         <div style="font-size:12px;color:var(--text2);font-weight:500;">${dateStr}</div>
         ${h.comment ? `<div class="history-comment">${h.comment}</div>` : ''}
       </div>
-      <span class="history-type" style="font-size:11px;">${displayMethod}${qtyLabel}</span>
+      <span class="history-type" style="font-size:11px;">${baseMethod}${qtyLabel}</span>
       <button class="btn-icon" style="font-size:12px;color:var(--danger);margin-left:4px;" onclick="deleteStampHistoryItemFromPanel('${boardId}',${origIdx})">✕</button>
     </div>`;
   }).join('') + '</div>';
@@ -2221,6 +2305,8 @@ function addStamp() {
   closePanel('overlay-add-stamp');
   showToast(toastMsg);
   renderStampBoards();
+  renderCouponList();
+  renderHome();
 }
 
 // ---- COUPON ----
@@ -2529,9 +2615,8 @@ function saveManualCoupon() {
   const coupons = getCoupons();
   if (!coupons[key].history) coupons[key].history = [];
   coupons[key].history.push({ type, date, comment: comment || type, qty });
-  if (type === '획득' || type === '복원') coupons[key].count += qty;
-  if (type === '사용') coupons[key].count = Math.max(0, coupons[key].count - qty);
-
+  // count 필드는 calcCouponCount()로 실시간 계산하므로 별도 관리 불필요
+  // (하위 호환성만 유지)
   saveCoupons(coupons);
   closePanel('overlay-coupon-manual');
   renderCouponList();
@@ -2582,6 +2667,9 @@ function importData(e) {
       if (data.settings)  { saveSettings(data.settings); applyDark(data.settings.darkMode); }
       showToast('데이터를 성공적으로 불러왔습니다');
       renderHome();
+      renderCalendar();
+      renderCoupon();
+      renderStats();
     } catch { showToast('파일 형식 오류'); }
   };
   reader.readAsText(file);
