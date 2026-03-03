@@ -383,7 +383,7 @@
     <div id="home-stamps"></div>
   </div>
   <div class="card">
-    <div class="card-title">🎟 쿠폰 잔여</div>
+    <div class="card-title">🎟 쿠폰 현황</div>
     <div id="home-coupons"></div>
   </div>
   <div class="card">
@@ -434,7 +434,7 @@
 <!-- ========== COUPON / STAMP ========== -->
 <div class="page" id="page-coupon">
   <div class="page-header">
-    <div class="page-title">🎫 쿠폰·도장</div>
+    <div class="page-title">쿠폰·도장</div>
     <button class="btn btn-outline btn-sm" onclick="openAddStampBoard()">+ 도장판</button>
   </div>
 
@@ -445,7 +445,7 @@
   <!-- 할인권 지갑 -->
   <div class="card" style="margin-bottom:16px;">
     <div class="flex-between" style="margin-bottom:12px;">
-      <div class="card-title" style="margin:0;">👛 할인권 지갑</div>
+      <div class="card-title" style="margin:0;">쿠폰 현황</div>
       <button class="btn btn-primary btn-sm" onclick="openAddCouponManual()">+ 할인권 추가/차감</button>
     </div>
     <div id="coupon-list"></div>
@@ -1476,23 +1476,24 @@ function renderHome() {
   const f40    = homeCouponFinal('discount40');
   const f50    = homeCouponFinal('discount50');
   const fPas   = homeCouponFinal('discountPass');
-  function couponNumHtml(cur, final) {
-    return `<div class="home-coupon-nums">
-      <div style="text-align:center;">
-        <div style="font-size:10px;color:var(--text3);margin-bottom:1px;">잔여</div>
-        <span class="home-coupon-cur">${cur}</span>
-      </div>
-      <span class="home-coupon-sep">/</span>
-      <div style="text-align:center;">
-        <div style="font-size:10px;color:var(--text3);margin-bottom:1px;">최종</div>
-        <span class="home-coupon-final" style="font-size:20px;font-weight:700;color:var(--text2);">${final}</span>
-      </div>
-    </div>`;
-  }
-  document.getElementById('home-coupons').innerHTML = `
-    <div class="home-coupon-row"><span class="home-coupon-name">🏷 40% 할인권</span>${couponNumHtml(c40,f40)}</div>
-    <div class="home-coupon-row"><span class="home-coupon-name">🏷 50% 할인권</span>${couponNumHtml(c50,f50)}</div>
-    <div class="home-coupon-row"><span class="home-coupon-name">🎟 할인 증빙 PASS</span>${couponNumHtml(cPas,fPas)}</div>`;
+  const homeCouponItems = [
+    { key:'discount40',   label:'40% 할인권',    cur:c40,  final:f40  },
+    { key:'discount50',   label:'50% 할인권',    cur:c50,  final:f50  },
+    { key:'discountPass', label:'할인 증빙 PASS', cur:cPas, final:fPas }
+  ];
+  document.getElementById('home-coupons').innerHTML =
+    `<div class="coupon-cards">${homeCouponItems.map(item => `
+      <div class="coupon-card">
+        <div class="coupon-card-label">${item.label}</div>
+        <div class="coupon-card-sub-row">
+          <div class="coupon-card-sub">잔여</div>
+          <div class="coupon-card-sub">최종</div>
+        </div>
+        <div class="coupon-card-num-row">
+          <div class="coupon-card-num">${item.cur}</div>
+          <div class="coupon-card-num final">${item.final}</div>
+        </div>
+      </div>`).join('')}</div>`;
 
   // ⑤ 최근 관람 (이미 지난 것 또는 미정)
   const past = records
