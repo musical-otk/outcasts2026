@@ -381,12 +381,17 @@
     <div id="home-upcoming"></div>
   </div>
   <div class="card">
-    <div class="card-title">📡 교신일지 현황</div>
-    <div id="home-stamps"></div>
-  </div>
-  <div class="card">
     <div class="card-title">🎟 쿠폰 현황</div>
     <div id="home-coupons"></div>
+  </div>
+  <div class="card" style="padding-bottom:0;">
+    <div class="card-title" onclick="toggleHomeStamps()" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;margin-bottom:0;padding-bottom:8px;">
+      <span>📡 교신일지 현황</span>
+      <span id="home-stamps-toggle-icon" style="font-size:11px;color:var(--text3);">▲</span>
+    </div>
+    <div id="home-stamps-wrap">
+      <div id="home-stamps" style="padding-bottom:8px;"></div>
+    </div>
   </div>
   <div class="card">
     <div class="card-title">📋 최근 관람</div>
@@ -440,11 +445,7 @@
     <button class="btn btn-outline btn-sm" onclick="openAddStampBoard()">+ 도장판</button>
   </div>
 
-  <!-- 교신일지 카드 -->
-  <div class="section-title" style="margin-bottom:8px;">교신일지 카드</div>
-  <div id="stamp-boards-list" style="margin-bottom:16px;"></div>
-
-  <!-- 할인권 지갑 -->
+  <!-- 쿠폰 현황 -->
   <div class="card" style="margin-bottom:16px;">
     <div class="flex-between" style="margin-bottom:12px;">
       <div class="card-title" style="margin:0;">쿠폰 현황</div>
@@ -454,13 +455,23 @@
     <div style="margin-top:10px;">
       <button class="btn btn-outline btn-sm" style="width:100%;" onclick="openAddCouponPack()">🎁 쿠폰팩 추가 (3종 +1)</button>
     </div>
+    <div style="margin-top:8px;font-size:11px;color:var(--text3);text-align:center;">쿠폰팩 사용 기간: 2026.03.17 ~ 2026.04.19</div>
   </div>
 
   <!-- 전체 이력 표 -->
-  <div class="card" style="margin-bottom:16px;">
-    <div class="card-title">할인권 상세 기록</div>
-    <div id="coupon-all-history"></div>
+  <div class="card" style="margin-bottom:16px;padding-bottom:0;">
+    <div class="card-title" onclick="toggleCouponHistory()" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;margin-bottom:0;padding-bottom:8px;">
+      <span>할인권 상세 기록</span>
+      <span id="coupon-history-toggle-icon" style="font-size:11px;color:var(--text3);">▼</span>
+    </div>
+    <div id="coupon-history-wrap" style="display:none;">
+      <div id="coupon-all-history" style="padding-bottom:8px;"></div>
+    </div>
   </div>
+
+  <!-- 교신일지 카드 -->
+  <div class="section-title" style="margin-bottom:8px;">교신일지 카드</div>
+  <div id="stamp-boards-list" style="margin-bottom:16px;"></div>
 </div>
 
 <!-- ========== STATS ========== -->
@@ -1398,10 +1409,38 @@ function deleteCurrentRecord() {
 // ============================================================
 // HOME
 // ============================================================
+function toggleHomeStamps() {
+  const wrap = document.getElementById('home-stamps-wrap');
+  const icon = document.getElementById('home-stamps-toggle-icon');
+  if (!wrap) return;
+  const collapsed = wrap.style.display === 'none';
+  wrap.style.display = collapsed ? '' : 'none';
+  icon.textContent   = collapsed ? '▲' : '▼';
+  // 상태 저장
+  DB.set('homeStampsCollapsed', !collapsed);
+}
+
+function toggleCouponHistory() {
+  const wrap = document.getElementById('coupon-history-wrap');
+  const icon = document.getElementById('coupon-history-toggle-icon');
+  if (!wrap) return;
+  const collapsed = wrap.style.display === 'none';
+  wrap.style.display = collapsed ? '' : 'none';
+  icon.textContent   = collapsed ? '▲' : '▼';
+  DB.set('couponHistoryCollapsed', !collapsed);
+}
+
 function renderHome() {
   const records = getRecords();
   const today   = new Date().toISOString().slice(0,10);
   const dow     = ['일','월','화','수','목','금','토'];
+
+  // 교신일지 접힘 상태 복원
+  const stampsCollapsed = DB.get('homeStampsCollapsed', false);
+  const stampsWrap = document.getElementById('home-stamps-wrap');
+  const stampsIcon = document.getElementById('home-stamps-toggle-icon');
+  if (stampsWrap) stampsWrap.style.display = stampsCollapsed ? 'none' : '';
+  if (stampsIcon) stampsIcon.textContent   = stampsCollapsed ? '▼' : '▲';
 
   // 예매확정 + 미정 포함 미래 일정
   const upcoming = records
@@ -2463,6 +2502,13 @@ function renderCouponList() {
   const boards  = getStampBoards();
   const records = getRecords();
   const today   = new Date().toISOString().slice(0, 10);
+
+  // 이력 접힘 상태 복원 (디폴트: 접힘)
+  const histCollapsed = DB.get('couponHistoryCollapsed', true);
+  const histWrap = document.getElementById('coupon-history-wrap');
+  const histIcon = document.getElementById('coupon-history-toggle-icon');
+  if (histWrap) histWrap.style.display = histCollapsed ? 'none' : '';
+  if (histIcon) histIcon.textContent   = histCollapsed ? '▼' : '▲';
 
   // 최종 = 날짜 제한 없이 전체 + 미달성 milestone
   function calcFinal(key) {
