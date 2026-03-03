@@ -384,13 +384,13 @@
     <div class="card-title">🎟 쿠폰 현황</div>
     <div id="home-coupons"></div>
   </div>
-  <div class="card" style="padding-bottom:0;">
-    <div class="card-title" onclick="toggleHomeStamps()" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;margin-bottom:0;padding-bottom:8px;">
+  <div class="card">
+    <div class="card-title" onclick="toggleHomeStamps()" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;margin-bottom:0;">
       <span>📡 교신일지 현황</span>
       <span id="home-stamps-toggle-icon" style="font-size:11px;color:var(--text3);">▲</span>
     </div>
     <div id="home-stamps-wrap">
-      <div id="home-stamps" style="padding-bottom:8px;"></div>
+      <div id="home-stamps" style="margin-top:8px;"></div>
     </div>
   </div>
   <div class="card">
@@ -459,13 +459,13 @@
   </div>
 
   <!-- 전체 이력 표 -->
-  <div class="card" style="margin-bottom:16px;padding-bottom:0;">
-    <div class="card-title" onclick="toggleCouponHistory()" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;margin-bottom:0;padding-bottom:8px;">
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-title" onclick="toggleCouponHistory()" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;margin-bottom:0;">
       <span>할인권 상세 기록</span>
       <span id="coupon-history-toggle-icon" style="font-size:11px;color:var(--text3);">▼</span>
     </div>
     <div id="coupon-history-wrap" style="display:none;">
-      <div id="coupon-all-history" style="padding-bottom:8px;"></div>
+      <div id="coupon-all-history" style="margin-top:8px;"></div>
     </div>
   </div>
 
@@ -661,7 +661,7 @@
         <option value="장애인/국가유공자">장애인/국가유공자</option>
         <option value="기타">기타</option>
       </select>
-      <div id="rec-discount-warn" style="display:none;margin-top:6px;font-size:12px;color:var(--danger);">⚠ 해당 쿠폰 잔여가 없습니다</div>
+      <div id="rec-discount-warn" style="display:none;margin-top:6px;font-size:12px;color:var(--danger);">⚠ 현재 보유한 쿠폰이 없습니다</div>
     </div>
 
     <div class="form-group">
@@ -1187,7 +1187,7 @@ function saveRecord() {
     // 신규: 아직 이 record 없으므로 그대로 체크. 수정: 기존 쿠폰 반납분 고려
     const effectiveAvailable = available + (prevCouponKey === newCouponKey ? 0 : prevCouponKey ? 0 : 0);
     if (available <= 0 && !(editId && prevCouponKey === newCouponKey)) {
-      showToast('해당 쿠폰 잔여가 없습니다');
+      showToast('현재 보유한 쿠폰이 없습니다');
       return;
     }
   }
@@ -1537,18 +1537,24 @@ function renderHome() {
     { key:'discountPass', label:'할인 증빙 PASS', cur:cPas, final:fPas }
   ];
   document.getElementById('home-coupons').innerHTML =
-    `<div class="coupon-cards">${homeCouponItems.map(item => `
-      <div class="coupon-card">
+    `<div class="coupon-cards">${homeCouponItems.map(item => {
+      const earned = (coupons[item.key].history||[]).filter(h=>h.type==='획득'||h.type==='복원').reduce((s,h)=>s+(h.qty||1),0)
+        + boards.reduce((s,b)=>s+(b.milestones||[]).filter(m=>(m.couponKey||'discount50')===item.key&&m.notified).length,0);
+      const used   = records.filter(r=>(DISCOUNT_COUPON_MAP[r.discountType]||null)===item.key).length
+        + (coupons[item.key].history||[]).filter(h=>h.type==='사용').reduce((s,h)=>s+(h.qty||1),0);
+      return `<div class="coupon-card">
         <div class="coupon-card-label">${item.label}</div>
         <div class="coupon-card-sub-row">
-          <div class="coupon-card-sub">잔여</div>
+          <div class="coupon-card-sub">현재</div>
           <div class="coupon-card-sub">최종</div>
         </div>
         <div class="coupon-card-num-row">
           <div class="coupon-card-num">${item.cur}</div>
           <div class="coupon-card-num final">${item.final}</div>
         </div>
-      </div>`).join('')}</div>`;
+        <div style="font-size:10px;color:var(--text3);text-align:center;margin-top:4px;">적립 ${earned} · 사용 ${used}</div>
+      </div>`;
+    }).join('')}</div>`;
 
   // ⑤ 최근 관람 (이미 지난 것 또는 미정)
   const past = records
@@ -2520,16 +2526,22 @@ function renderCouponList() {
   const cardsHtml = `<div class="coupon-cards">${COUPON_ITEMS.map(item => {
     const cur   = calcCouponCount(item.key, coupons, boards, records, today); // 오늘까지 기준
     const final = calcFinal(item.key);                                         // 전체 기준
+    // 최종 기준 적립/사용 합산
+    const earned = (coupons[item.key].history||[]).filter(h=>h.type==='획득'||h.type==='복원').reduce((s,h)=>s+(h.qty||1),0)
+      + boards.reduce((s,b)=>s+(b.milestones||[]).filter(m=>(m.couponKey||'discount50')===item.key&&m.notified).length,0);
+    const used   = records.filter(r=>(DISCOUNT_COUPON_MAP[r.discountType]||null)===item.key).length
+      + (coupons[item.key].history||[]).filter(h=>h.type==='사용').reduce((s,h)=>s+(h.qty||1),0);
     return `<div class="coupon-card">
       <div class="coupon-card-label">${item.label}</div>
       <div class="coupon-card-sub-row">
-        <div class="coupon-card-sub">잔여</div>
+        <div class="coupon-card-sub">현재</div>
         <div class="coupon-card-sub">최종</div>
       </div>
       <div class="coupon-card-num-row">
         <div class="coupon-card-num">${cur}</div>
         <div class="coupon-card-num final">${final}</div>
       </div>
+      <div style="font-size:10px;color:var(--text3);text-align:center;margin-top:4px;">적립 ${earned} · 사용 ${used}</div>
     </div>`;
   }).join('')}</div>`;
 
