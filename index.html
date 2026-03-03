@@ -1359,10 +1359,7 @@ function buildMiniSeat(zone, row, num) {
         const emptyCnt = z === 'B' ? (r===0?12:13) : 4;
         for (let i=0; i<emptyCnt; i++) zHtml[z] += '<div class="mini-seat-cell" style="visibility:hidden;"></div>';
       } else {
-        // B구역 0열은 12칸 — 1~13열(13칸)과 정렬 맞추기 위해 앞에 빈 셀 1개 추가
-        if (z === 'B' && r === 0) {
-          zHtml[z] += `<div class="mini-seat-cell" style="visibility:hidden;"></div>`;
-        }
+        if (z === 'B' && r === 0) zHtml[z] += '<div class="mini-seat-cell" style="visibility:hidden;width:5px;flex-shrink:0;"></div>';
         for (let col=1; col<=c.cols(r); col++) {
           const hl = z===zone && r===parseInt(row) && col===parseInt(num);
           zHtml[z] += `<div class="mini-seat-cell${hl?' highlight':''}"></div>`;
@@ -1894,11 +1891,8 @@ function renderHeatmap() {
         zHtml[z.name] += `</div>`;
       } else {
         const colCnt = z.cols(row);
-        zHtml[z.name] += `<div class="seat-row"><div class="row-label">${row}열</div>`;
-        // B구역 0열은 12칸 — 1~13열(13칸)과 정렬 맞추기 위해 앞에 빈 셀 1개 추가
-        if (z.name === 'B' && row === 0) {
-          zHtml[z.name] += `<div class="seat-cell" style="visibility:hidden;"></div>`;
-        }
+        const rowStyle = (z.name === 'B' && row === 0) ? ' style="margin-left:9px;"' : '';
+        zHtml[z.name] += `<div class="seat-row"${rowStyle}><div class="row-label">${row}열</div>`;
         for (let col = 1; col <= colCnt; col++) {
           const k   = `${z.name}-${row}-${col}`;
           const cnt = seatMap[k] || 0;
