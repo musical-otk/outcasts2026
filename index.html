@@ -179,9 +179,9 @@
   .zone-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; }
   .zone-label { font-size: 11px; font-weight: 700; color: var(--text3); }
   .seat-grid { display: flex; flex-direction: column; gap: 2px; }
-  .seat-row { display: flex; gap: 2px; align-items: center; }
-  .row-label { font-size: 9px; color: var(--text3); width: 28px; text-align: right; margin-right: 2px; white-space: nowrap; }
-  .seat-cell { width: 16px; height: 16px; border-radius: 3px; background: var(--bg3); border: 1px solid var(--border); transition: background 0.2s; flex-shrink: 0; }
+  .seat-row { display: flex; gap: 1px; align-items: center; }
+  .row-label { font-size: 8px; color: var(--text3); width: 20px; flex-shrink: 0; text-align: right; white-space: nowrap; }
+  .seat-cell { width: 10px; height: 10px; border-radius: 2px; background: var(--bg3); border: 1px solid var(--border); transition: background 0.2s; flex-shrink: 0; }
   .seat-cell.v1 { background: var(--seat1); border-color: var(--seat1); }
   .seat-cell.v2 { background: var(--seat2); border-color: var(--seat2); }
   .seat-cell.v3 { background: var(--seat3); border-color: var(--seat3); }
@@ -313,7 +313,8 @@
   .upcoming-item:last-child { border-bottom: none; }
   .upcoming-dday { font-size: 12px; font-weight: 700; color: var(--accent); min-width: 36px; }
   .upcoming-date { font-size: 12px; color: var(--text2); flex: 1; }
-  .upcoming-cast { font-size: 12px; color: var(--text3); }
+  .upcoming-cast { font-size: 12px; color: var(--text3); white-space: nowrap; }
+  .upcoming-seat { font-size: 11px; color: var(--text3); opacity: 0.75; white-space: nowrap; }
 
   .home-stamp-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
   .home-stamp-row:last-child { border-bottom: none; }
@@ -744,7 +745,7 @@
     <div class="panel-handle"></div>
     <div class="flex-between" style="margin-bottom:20px;">
       <div class="panel-title">이력 직접 추가</div>
-      <button class="btn-icon" onclick="closePanel('overlay-direct-stamp')">✕</button>
+      <button class="btn-icon" onclick="cancelDirectStamp()">✕</button>
     </div>
     <div class="form-group">
       <label class="form-label">날짜</label>
@@ -942,6 +943,7 @@ const DB = {
   get(key, def) { try { return JSON.parse(localStorage.getItem('roger_'+key)) ?? def; } catch { return def; } },
   set(key, val) { localStorage.setItem('roger_'+key, JSON.stringify(val)); }
 };
+function localDate() { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function getRecords()      { return DB.get('records', []); }
 function saveRecords(r)    { DB.set('records', r); }
 function getSchedule()     { return DB.get('schedule', []); }
@@ -1271,7 +1273,7 @@ function saveRecord() {
             newBoard.history.push({
               recordId: editId,
               date,
-              method: `${skylar}×${didi} 관람 연동` + qtyLabel,
+              method: `${skylar} · ${didi} 관람 연동` + qtyLabel,
               comment: '',
               qty: actualQty
             });
@@ -1293,7 +1295,7 @@ function saveRecord() {
   } else {
     records.push(record);
     if (stampBoardId) {
-      const toastMsg = applyStampToBoard(stampBoardId, stampQty, date, `${skylar}×${didi} 관람 연동`);
+      const toastMsg = applyStampToBoard(stampBoardId, stampQty, date, `${skylar} · ${didi} 관람 연동`);
       // 방금 추가된 history에 recordId 심기 (수정 시 정확한 삭제를 위해)
       const boards2 = getStampBoards();
       const board2  = boards2.find(b => b.id === stampBoardId);
@@ -1443,7 +1445,7 @@ function toggleCouponHistory() {
 
 function renderHome() {
   const records = getRecords();
-  const today   = new Date().toISOString().slice(0,10);
+  const today   = localDate();
   const dow     = ['일','월','화','수','목','금','토'];
 
   // 교신일지 접힘 상태 복원
@@ -1495,10 +1497,12 @@ function renderHome() {
       const todayD2 = new Date(today+'T00:00:00');
       const diff2 = Math.round((d2-todayD2)/86400000);
       const dday2 = diff2===0 ? 'D-DAY' : `D-${diff2}`;
+      const seat2 = r.seatZone ? `💺 ${r.seatZone}${r.seatRow}열 ${r.seatNumber}번` : '';
       return `<div class="upcoming-item" onclick="openDetail('${r.id}')">
         <div class="upcoming-dday" style="${r.isBooked===false ? 'color:var(--text3);' : ''}">${dday2}</div>
         <div class="upcoming-date">${r.date.slice(5)} (${dow[d2.getDay()]}) ${r.time}</div>
-        <div class="upcoming-cast">${r.skylar}×${r.didi}${r.isBooked===false ? ' <span style="font-size:10px;color:var(--text3);">미정</span>' : ''}</div>
+        <div class="upcoming-cast">${r.skylar} · ${r.didi}${r.isBooked===false ? ' <span style="font-size:10px;color:var(--text3);">미정</span>' : ''}</div>
+        ${seat2 ? `<div class="upcoming-seat">${seat2}</div>` : ''}
       </div>`;
     }).join('');
   } else {
@@ -1526,7 +1530,7 @@ function renderHome() {
 
   // ④ 쿠폰
   const coupons = getCoupons();
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = localDate();
   // 잔여: 오늘까지 기준 / 최종: 미달성 milestone 포함 전체
   function homeCouponFinal(key) {
     const cur = calcCouponCount(key, coupons, boards, records);
@@ -1579,8 +1583,8 @@ function renderHome() {
     ? '<div style="text-align:center;color:var(--text3);padding:12px;font-size:13px;">기록이 없습니다</div>'
     : past.map(r=>`
         <div class="record-mini" onclick="openDetail('${r.id}')">
-          <div class="record-date-badge">${r.date.slice(5)}<br>${r.time}</div>
-          <div class="record-casting">${r.skylar} × ${r.didi}</div>
+          <div class="record-date-badge">${r.date.slice(5)} ${r.time}</div>
+          <div class="record-casting">${r.skylar} · ${r.didi}</div>
           <div class="record-rating">${r.rating?'★'.repeat(r.rating):''}</div>
         </div>`).join('');
 }
@@ -1616,7 +1620,7 @@ function updateCalFilterHint() {
   if (!el) return;
   const hasFilter = calFilterSky || calFilterDidi;
   el.textContent = hasFilter
-    ? `· ${[calFilterSky, calFilterDidi].filter(Boolean).join(' × ')} 회차 표시 중`
+    ? `· ${[calFilterSky, calFilterDidi].filter(Boolean).join(' · ')} 회차 표시 중`
     : '· 전체 회차 표시 중';
 }
 
@@ -1647,7 +1651,7 @@ function renderCalendar() {
 
   const firstDay   = new Date(calYear, calMonth, 1).getDay();
   const lastDate   = new Date(calYear, calMonth+1, 0).getDate();
-  const todayStr   = new Date().toISOString().slice(0,10);
+  const todayStr   = localDate();
   const totalCells = firstDay + lastDate;
   const weeks      = Math.ceil(totalCells / 7);
   const monthStr   = `${calYear}-${String(calMonth+1).padStart(2,'0')}`;
@@ -1790,7 +1794,7 @@ function renderCalDayPanel(ds, daySch, doneSet, bookedSet, records) {
         : `<button class="cal-session-add" onclick="openAddRecordFromSchedule('${ds}','${s.time}','${s.skylar}','${s.didi}')">+ 기록</button>`;
       html += `<div class="cal-session-row">
         <div class="cal-session-time">${s.time}</div>
-        <div class="cal-session-casting"><span class="sky">${s.skylar}</span> × <span class="didi">${s.didi}</span></div>
+        <div class="cal-session-casting"><span class="sky">${s.skylar}</span> · <span class="didi">${s.didi}</span></div>
         ${badge}${btn}
       </div>`;
     });
@@ -1798,7 +1802,7 @@ function renderCalDayPanel(ds, daySch, doneSet, bookedSet, records) {
     dayRecords.sort((a,b)=>a.time.localeCompare(b.time)).forEach(r => {
       html += `<div class="cal-session-row">
         <div class="cal-session-time">${r.time}</div>
-        <div class="cal-session-casting"><span class="sky">${r.skylar}</span> × <span class="didi">${r.didi}</span></div>
+        <div class="cal-session-casting"><span class="sky">${r.skylar}</span> · <span class="didi">${r.didi}</span></div>
         <span class="cal-session-badge done">✅</span>
         <button class="cal-session-add" onclick="openDetail('${r.id}')">상세</button>
       </div>`;
@@ -2007,7 +2011,7 @@ function renderCoupon() { renderStampBoards(); renderCouponList(); }
 function calcStampCounts(b) {
   // 현재: 오늘 날짜까지 찍힌 도장 수
   // 최종: history 전체 합산 (미래 포함)
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDate();
   let curCount = 0, finalCount = 0;
   (b.history || []).forEach(h => {
     const qty = h.qty || 1;
@@ -2095,6 +2099,11 @@ function renderStampBoards() {
 
 // 이력 패널 — 선택된 도장판 이력을 고정 overlay에 표시
 let _stampHistoryPanelBoardId = null;
+let _directStampFromHistory = false;
+function cancelDirectStamp() {
+  closePanel('overlay-direct-stamp');
+  if (_directStampFromHistory) { _directStampFromHistory = false; openPanel('overlay-stamp-history'); }
+}
 function openStampHistory(boardId) {
   _stampHistoryPanelBoardId = boardId;
   renderStampHistoryPanel();
@@ -2139,8 +2148,10 @@ function renderStampHistoryPanel() {
 function openAddStampHistoryDirectFromPanel() {
   if (!_stampHistoryPanelBoardId) return;
   _stampHistoryTargetId = _stampHistoryPanelBoardId;
-  document.getElementById('direct-stamp-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('direct-stamp-date').value = localDate();
   document.getElementById('direct-stamp-comment').value = '';
+  _directStampFromHistory = true;
+  closePanel('overlay-stamp-history');
   openPanel('overlay-direct-stamp');
 }
 
@@ -2173,7 +2184,7 @@ function deleteStampHistoryItemFromPanel(boardId, origIdx) {
 let _stampHistoryTargetId = null;
 function openAddStampHistoryDirect(boardId) {
   _stampHistoryTargetId = boardId;
-  document.getElementById('direct-stamp-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('direct-stamp-date').value = localDate();
   document.getElementById('direct-stamp-comment').value = '';
   openPanel('overlay-direct-stamp');
 }
@@ -2201,6 +2212,7 @@ function saveDirectStampHistory() {
   renderCouponList();
   renderHome();
   if (_stampHistoryPanelBoardId === boardId) renderStampHistoryPanel();
+  if (_directStampFromHistory) { _directStampFromHistory = false; openPanel('overlay-stamp-history'); }
   showToast(toast);
 }
 
@@ -2291,7 +2303,7 @@ function openAddStamp(boardId) {
   const qtyEl = document.querySelector('input[name="stamp-qty"][value="1"]');
   if (qtyEl) qtyEl.checked = true;
   const dateEl = document.getElementById('stamp-date');
-  if (dateEl) dateEl.value = new Date().toISOString().slice(0,10);
+  if (dateEl) dateEl.value = localDate();
   const commentEl = document.getElementById('stamp-comment');
   if (commentEl) commentEl.value = '';
   updateQtyLabel();
@@ -2378,7 +2390,7 @@ function addStamp() {
   const qtyEl     = document.querySelector('input[name="stamp-qty"]:checked');
   const qty       = qtyEl ? parseInt(qtyEl.value) || 1 : 1;
   const dateEl    = document.getElementById('stamp-date');
-  const date      = dateEl && dateEl.value ? dateEl.value : new Date().toISOString().slice(0,10);
+  const date      = dateEl && dateEl.value ? dateEl.value : localDate();
 
   const toastMsg = applyStampToBoard(boardId, qty, date, method);
   if (!toastMsg) return;
@@ -2443,7 +2455,7 @@ function openAddStampBoardFromRecord() {
 }
 
 function openAddCouponPack() {
-  document.getElementById('coupon-pack-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('coupon-pack-date').value = localDate();
   document.getElementById('coupon-pack-comment').value = '';
   openPanel('overlay-coupon-pack');
 }
@@ -2515,7 +2527,7 @@ function renderCouponList() {
   const coupons = getCoupons();
   const boards  = getStampBoards();
   const records = getRecords();
-  const today   = new Date().toISOString().slice(0, 10);
+  const today   = localDate();
 
   // 이력 접힘 상태 복원 (디폴트: 접힘)
   const histCollapsed = DB.get('couponHistoryCollapsed', true);
@@ -2604,7 +2616,7 @@ function renderCouponAllHistory() {
     if (!item) return;
     allRows.push({
       date: r.date, type: '사용', key, short: item.short,
-      comment: `${r.skylar}×${r.didi} 관람`,
+      comment: `${r.skylar} · ${r.didi} 관람`,
       qty: 1, originalIdx: -1, rowType: 'record'
     });
   });
@@ -2670,7 +2682,7 @@ function openAddCouponManual() {
   document.getElementById('manual-coupon-key').value = 'discount40';
   document.querySelector('input[name="manual-coupon-type"][value="획득"]').checked = true;
   document.querySelector('input[name="manual-coupon-qty"][value="1"]').checked = true;
-  document.getElementById('manual-coupon-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('manual-coupon-date').value = localDate();
   document.getElementById('manual-coupon-comment').value = '';
   updateManualTypeLabel();
   updateManualQtyLabel();
@@ -2744,7 +2756,7 @@ function exportData() {
   };
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
-  a.download = `roger_backup_${new Date().toISOString().slice(0,10)}.json`;
+  a.download = `roger_backup_${localDate()}.json`;
   a.click();
   showToast('백업 파일이 다운로드되었습니다');
 }
