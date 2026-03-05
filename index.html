@@ -26,7 +26,6 @@
     --shadow: 0 2px 12px rgba(0,0,0,0.4);
     --seat1: #162840; --seat2: #1e3d5a; --seat3: #2a5280; --seat4: #3a6aaa; --seat5: #5a8cdd;
   }
-  [data-theme="dark"] .next-show-card { background: linear-gradient(135deg, #1a3460 0%, #2a5088 100%); }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: 'Apple SD Gothic Neo', sans-serif;
@@ -1480,7 +1479,7 @@ function renderHome() {
           <span class="next-show-pill sky">스카일러 ${nextShow.skylar}</span>
           <span class="next-show-pill didi">디디 ${nextShow.didi}</span>
         </div>
-        ${seat ? `<div class="next-show-seat">💺 ${seat}</div>` : ''}
+        ${seat ? `<div class="next-show-seat">${seat}</div>` : ''}
       </div>`;
   } else {
     document.getElementById('home-next-show').innerHTML = `
@@ -1503,8 +1502,8 @@ function renderHome() {
       return `<div class="upcoming-item" onclick="openDetail('${r.id}')">
         <div class="upcoming-dday" style="${r.isBooked===false ? 'color:var(--text3);' : ''}">${dday2}</div>
         <div class="upcoming-date">${r.date.slice(5)} (${dow[d2.getDay()]}) ${r.time}</div>
-        <div class="upcoming-cast">${r.skylar} · ${r.didi}${r.isBooked===false ? ' <span style="font-size:10px;color:var(--text3);">미정</span>' : ''}</div>
         ${seat2 ? `<div class="upcoming-seat">${seat2}</div>` : ''}
+        <div class="upcoming-cast">${r.skylar} · ${r.didi}${r.isBooked===false ? ' <span style="font-size:10px;color:var(--text3);">미정</span>' : ''}</div>
       </div>`;
     }).join('');
   } else {
