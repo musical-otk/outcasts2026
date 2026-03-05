@@ -24,7 +24,9 @@
     --accent: #5a8cdd; --accent2: #7aacff; --accent-light: #1a2a44;
     --danger: #ee6666; --success: #44aa66;
     --shadow: 0 2px 12px rgba(0,0,0,0.4);
+    --seat1: #162840; --seat2: #1e3d5a; --seat3: #2a5280; --seat4: #3a6aaa; --seat5: #5a8cdd;
   }
+  [data-theme="dark"] .next-show-card { background: linear-gradient(135deg, #1a3460 0%, #2a5088 100%); }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: 'Apple SD Gothic Neo', sans-serif;
@@ -175,7 +177,7 @@
   .role-section-title { font-size: 12px; font-weight: 700; color: var(--text3); padding: 6px 8px 2px; }
 
   /* HEATMAP */
-  .heatmap-wrap { display: flex; gap: 8px; justify-content: center; overflow-x: auto; padding: 8px 0; }
+  .heatmap-wrap { display: flex; gap: 4px; justify-content: center; overflow-x: auto; padding: 8px 0; }
   .zone-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; }
   .zone-label { font-size: 11px; font-weight: 700; color: var(--text3); }
   .seat-grid { display: flex; flex-direction: column; gap: 2px; }
@@ -312,8 +314,8 @@
   .upcoming-item { display: flex; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--border); cursor: pointer; gap: 10px; }
   .upcoming-item:last-child { border-bottom: none; }
   .upcoming-dday { font-size: 12px; font-weight: 700; color: var(--accent); min-width: 36px; }
-  .upcoming-date { font-size: 12px; color: var(--text2); flex: 1; }
-  .upcoming-cast { font-size: 12px; color: var(--text3); white-space: nowrap; }
+  .upcoming-date { font-size: 12px; color: var(--text2); }
+  .upcoming-cast { font-size: 12px; color: var(--text3); white-space: nowrap; flex: 1; }
   .upcoming-seat { font-size: 11px; color: var(--text3); opacity: 0.75; white-space: nowrap; }
 
   .home-stamp-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
@@ -1497,7 +1499,7 @@ function renderHome() {
       const todayD2 = new Date(today+'T00:00:00');
       const diff2 = Math.round((d2-todayD2)/86400000);
       const dday2 = diff2===0 ? 'D-DAY' : `D-${diff2}`;
-      const seat2 = r.seatZone ? `💺 ${r.seatZone}${r.seatRow}열 ${r.seatNumber}번` : '';
+      const seat2 = r.seatZone ? `${r.seatZone}${r.seatRow}열 ${r.seatNumber}번` : '';
       return `<div class="upcoming-item" onclick="openDetail('${r.id}')">
         <div class="upcoming-dday" style="${r.isBooked===false ? 'color:var(--text3);' : ''}">${dday2}</div>
         <div class="upcoming-date">${r.date.slice(5)} (${dow[d2.getDay()]}) ${r.time}</div>
