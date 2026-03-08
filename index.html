@@ -1349,8 +1349,8 @@ function openDetail(id) {
       const sorted = [...(board.history||[])].sort((a,z) => a.date.localeCompare(z.date));
       let cumulative = 0, seq = null;
       for (const h of sorted) {
-        // qty 필드 우선, 없으면 method ×N 파싱, 그것도 없으면 1
-        const hQty = h.qty != null ? h.qty : ((h.method && h.method.match(/×(\d+)/)) ? parseInt(h.method.match(/×(\d+)/)[1]) : 1);
+        // qty 필드 기준으로만 계산 (recalcStampCount와 동일한 로직)
+        const hQty = h.qty ?? 1;
         const isThisRecord = h.recordId ? h.recordId === r.id : h.date === r.date;
         if (isThisRecord && seq === null) seq = cumulative + 1;
         cumulative += hQty;
