@@ -745,26 +745,6 @@
   </div>
 </div>
 
-<!-- ===== DIRECT STAMP HISTORY PANEL ===== -->
-<div class="overlay" id="overlay-direct-stamp">
-  <div class="panel">
-    <div class="panel-handle"></div>
-    <div class="flex-between" style="margin-bottom:20px;">
-      <div class="panel-title">이력 직접 추가</div>
-      <button class="btn-icon" onclick="cancelDirectStamp()">✕</button>
-    </div>
-    <div class="form-group">
-      <label class="form-label">날짜</label>
-      <input type="date" class="form-control" id="direct-stamp-date">
-    </div>
-    <div class="form-group">
-      <label class="form-label">코멘트 (선택)</label>
-      <input type="text" class="form-control" id="direct-stamp-comment" placeholder="예: 도장 나눔">
-    </div>
-    <button class="btn btn-primary" style="width:100%;margin-top:8px;" onclick="saveDirectStampHistory()">추가</button>
-  </div>
-</div>
-
 <!-- ===== STAMP HISTORY PANEL ===== -->
 <div class="overlay" id="overlay-stamp-history">
   <div class="panel">
@@ -830,7 +810,9 @@
       <div style="display:flex;flex-direction:column;gap:8px;">
         <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;"><input type="radio" name="stamp-method" value="직접 관람" checked onchange="updateStampSessionOptions()"> 직접 관람</label>
         <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;"><input type="radio" name="stamp-method" value="적립권 사용" onchange="updateStampSessionOptions()"> 적립권 사용</label>
-        <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;"><input type="radio" name="stamp-method" value="나눔 수령" onchange="updateStampSessionOptions()"> 나눔 수령</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;"><input type="radio" name="stamp-method" value="교환" onchange="updateStampSessionOptions()"> 교환</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;"><input type="radio" name="stamp-method" value="나눔" onchange="updateStampSessionOptions()"> 나눔</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;"><input type="radio" name="stamp-method" value="기타" onchange="updateStampSessionOptions()"> 기타</label>
       </div>
     </div>
     <div class="form-group" style="margin-top:12px;">
@@ -1249,7 +1231,8 @@ function saveRecord() {
     records[records.findIndex(x=>x.id===editId)] = record;
     const prevStampBoardId = prevRecord?.stampBoardId || null;
     const prevStampQty     = prevRecord?.stampQty || 1;
-    const stampChanged = stampBoardId !== prevStampBoardId || stampQty !== prevStampQty;
+    const stampChanged = stampBoardId !== prevStampBoardId || stampQty !== prevStampQty
+      || (prevStampBoardId && date !== prevRecord.date);
 
     if (stampChanged) {
       const boards = getStampBoards();
@@ -1260,7 +1243,7 @@ function saveRecord() {
         if (prevBoard && prevBoard.history) {
           // recordId 매칭 우선, 없으면 date+method로 폴백
           const idx = prevBoard.history.map((h,i)=>({h,i})).reverse()
-            .find(({h}) => h.recordId === editId || h.date === (prevRecord?.date || date));
+            .find(({h}) => h.recordId === editId || (h.date === prevRecord.date && h.method?.includes('관람 연동')));
           if (idx !== undefined) prevBoard.history.splice(idx.i, 1);
           recalcStampCount(prevBoard);
           revalidateMilestones(prevBoard);
@@ -2090,6 +2073,7 @@ function renderStampBoards() {
       <div class="stamp-board-header">
         <div class="stamp-board-name">[📡 ${b.name}]</div>
         <div class="stamp-board-menu">
+          <button class="stamp-menu-btn" onclick="renameStampBoard('${b.id}')" title="이름 변경">📝</button>
           <button class="stamp-menu-btn" onclick="togglePauseStampBoard('${b.id}')" title="${paused ? '재개' : '일시정지'}">${paused ? '▶' : '⏸'}</button>
           <button class="stamp-menu-btn danger" onclick="deleteStampBoard('${b.id}')" title="삭제">✕</button>
         </div>
@@ -2120,10 +2104,6 @@ function renderStampBoards() {
 // 이력 패널 — 선택된 도장판 이력을 고정 overlay에 표시
 let _stampHistoryPanelBoardId = null;
 let _directStampFromHistory = false;
-function cancelDirectStamp() {
-  closePanel('overlay-direct-stamp');
-  if (_directStampFromHistory) { _directStampFromHistory = false; openPanel('overlay-stamp-history'); }
-}
 function openStampHistory(boardId) {
   _stampHistoryPanelBoardId = boardId;
   renderStampHistoryPanel();
@@ -2167,12 +2147,9 @@ function renderStampHistoryPanel() {
 
 function openAddStampHistoryDirectFromPanel() {
   if (!_stampHistoryPanelBoardId) return;
-  _stampHistoryTargetId = _stampHistoryPanelBoardId;
-  document.getElementById('direct-stamp-date').value = localDate();
-  document.getElementById('direct-stamp-comment').value = '';
   _directStampFromHistory = true;
   closePanel('overlay-stamp-history');
-  openPanel('overlay-direct-stamp');
+  openAddStamp(_stampHistoryPanelBoardId);
 }
 
 function deleteStampHistoryItemFromPanel(boardId, origIdx) {
@@ -2200,41 +2177,6 @@ function deleteStampHistoryItemFromPanel(boardId, origIdx) {
   showToast('이력이 삭제되었습니다');
 }
 
-// 교신일지 이력 직접 추가
-let _stampHistoryTargetId = null;
-function openAddStampHistoryDirect(boardId) {
-  _stampHistoryTargetId = boardId;
-  document.getElementById('direct-stamp-date').value = localDate();
-  document.getElementById('direct-stamp-comment').value = '';
-  openPanel('overlay-direct-stamp');
-}
-function saveDirectStampHistory() {
-  const boardId = _stampHistoryTargetId;
-  const date    = document.getElementById('direct-stamp-date').value;
-  const comment = document.getElementById('direct-stamp-comment').value.trim();
-  if (!date) { showToast('날짜를 입력해주세요'); return; }
-  const boards = getStampBoards();
-  const board  = boards.find(b => b.id === boardId);
-  if (!board) return;
-  if (!board.history) board.history = [];
-  board.history.push({ date, method: '직접 입력', comment, qty: 1 });
-  recalcStampCount(board);
-  let toast = '이력이 추가되었습니다';
-  (board.milestones||[]).forEach(m => {
-    if (board.currentCount >= m.at && !m.notified) {
-      m.notified = true;
-      toast = '◆ ' + m.reward + ' 달성!';
-    }
-  });
-  saveStampBoards(boards);
-  closePanel('overlay-direct-stamp');
-  renderStampBoards();
-  renderCouponList();
-  renderHome();
-  if (_stampHistoryPanelBoardId === boardId) renderStampHistoryPanel();
-  if (_directStampFromHistory) { _directStampFromHistory = false; openPanel('overlay-stamp-history'); }
-  showToast(toast);
-}
 
 // 교신일지 이력 직접 삭제 (연동 record의 stampBoardId도 해제)
 function deleteStampHistoryItem(boardId, origIdx) {
@@ -2291,6 +2233,18 @@ function saveStampBoard() {
   populateStampSelect(); // 기록 폼 select 갱신 (T5)
   showToast('도장판이 추가되었습니다');
   renderStampBoards();
+}
+
+function renameStampBoard(id) {
+  const boards = getStampBoards();
+  const board  = boards.find(b => b.id === id);
+  if (!board) return;
+  const newName = prompt('새 이름을 입력하세요', board.name);
+  if (newName !== null && newName.trim()) {
+    board.name = newName.trim();
+    saveStampBoards(boards);
+    renderStampBoards();
+  }
 }
 
 function deleteStampBoard(id) {
@@ -2382,7 +2336,7 @@ function revalidateMilestones(board) {
   });
 }
 
-function applyStampToBoard(boardId, qty, date, historyComment) {
+function applyStampToBoard(boardId, qty, date, historyComment, comment) {
   const boards = getStampBoards();
   const board  = boards.find(b => b.id === boardId);
   if (!board) return null;
@@ -2395,7 +2349,7 @@ function applyStampToBoard(boardId, qty, date, historyComment) {
 
   if (!board.history) board.history = [];
   const qtyLabel = actualQty > 1 ? ' ×' + actualQty : '';
-  board.history.push({ date, method: historyComment + qtyLabel, comment: '', qty: actualQty });
+  board.history.push({ date, method: historyComment + qtyLabel, comment: comment || '', qty: actualQty });
   recalcStampCount(board);
 
   if (!board.milestones) board.milestones = [{ at:3, reward:'50% 할인권', couponKey:'discount50', notified:false }];
@@ -2426,14 +2380,20 @@ function addStamp() {
   const date      = dateEl && dateEl.value ? dateEl.value : localDate();
   const sessionEl = document.querySelector('input[name="stamp-session"]:checked');
   const fullMethod = sessionEl ? `${method} (${sessionEl.value})` : method;
+  const comment   = document.getElementById('stamp-comment')?.value.trim() || '';
 
-  const toastMsg = applyStampToBoard(boardId, qty, date, fullMethod);
+  const toastMsg = applyStampToBoard(boardId, qty, date, fullMethod, comment);
   if (!toastMsg) return;
   closePanel('overlay-add-stamp');
   showToast(toastMsg);
   renderStampBoards();
   renderCouponList();
   renderHome();
+  if (_directStampFromHistory) {
+    _directStampFromHistory = false;
+    renderStampHistoryPanel();
+    openPanel('overlay-stamp-history');
+  }
 }
 
 // ---- COUPON ----
