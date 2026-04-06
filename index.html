@@ -1463,7 +1463,7 @@ function renderHome() {
     .filter(r => r.date >= today)
     .sort((a,b) => a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
 
-  const nextShow = upcoming.find(r => r.isBooked !== false) || upcoming[0];
+  const nextShow = upcoming[0];
   const rest     = upcoming.filter(r => r !== nextShow);
 
   // ① D-day 카드
