@@ -403,6 +403,7 @@
   <div class="card">
     <div class="card-title">📋 최근 관람</div>
     <div id="home-recent"></div>
+    <div id="home-recent-more" style="text-align:center;margin-top:6px;"></div>
   </div>
 </div>
 
@@ -1578,11 +1579,12 @@ function renderHome() {
     }).join('')}</div>`;
 
   // ⑤ 최근 관람 (이미 지난 것 또는 미정)
-  const past = records
+  const pastAll = records
     .filter(r => r.date < today)
-    .sort((a,b)=>b.date.localeCompare(a.date)||b.time.localeCompare(a.time))
-    .slice(0,3);
-  document.getElementById('home-recent').innerHTML = past.length===0
+    .sort((a,b)=>b.date.localeCompare(a.date)||b.time.localeCompare(a.time));
+  const showCount = DB.get('homeRecentCount', 3);
+  const past = pastAll.slice(0, showCount);
+  document.getElementById('home-recent').innerHTML = pastAll.length===0
     ? '<div style="text-align:center;color:var(--text3);padding:12px;font-size:13px;">기록이 없습니다</div>'
     : past.map(r=>`
         <div class="record-mini" onclick="openDetail('${r.id}')">
@@ -1590,6 +1592,15 @@ function renderHome() {
           <div class="record-casting">${r.skylar} · ${r.didi}</div>
           <div class="record-rating">${r.rating?'★'.repeat(r.rating):''}</div>
         </div>`).join('');
+  const moreEl = document.getElementById('home-recent-more');
+  if (showCount < pastAll.length) {
+    const addCount = Math.min(3, pastAll.length - showCount);
+    moreEl.innerHTML = `<button class="btn btn-outline btn-sm" onclick="DB.set('homeRecentCount',${showCount+3});renderHome()">더보기 (+${addCount}건)</button>`;
+  } else if (showCount > 3) {
+    moreEl.innerHTML = `<button class="btn btn-outline btn-sm" onclick="DB.set('homeRecentCount',3);renderHome()">접기</button>`;
+  } else {
+    moreEl.innerHTML = '';
+  }
 }
 
 // ============================================================
