@@ -1590,7 +1590,7 @@ function renderHome() {
         <div class="record-mini" onclick="openDetail('${r.id}')">
           <div class="record-date-badge">${r.date.slice(5)} ${r.time}</div>
           <div class="record-casting">${r.skylar} · ${r.didi}</div>
-          <div class="record-rating">${r.rating?'★'.repeat(r.rating):''}</div>
+          <div class="record-rating">${r.seatZone ? r.seatZone+'구역 '+r.seatRow+'열 '+r.seatNumber+'번' : ''}</div>
         </div>`).join('');
   const moreEl = document.getElementById('home-recent-more');
   if (showCount < pastAll.length) {
