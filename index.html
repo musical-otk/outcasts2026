@@ -551,7 +551,6 @@
       <button class="btn btn-outline" style="flex:1;" onclick="document.getElementById('import-file').click()">JSON 가져오기</button>
     </div>
     <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
-    <button class="btn btn-outline btn-sm" style="width:100%;margin-top:8px;" onclick="fixRecordTimings()">스케줄 기반 시간/캐스팅 자동 보완</button>
   </div>
   <div class="card">
     <div class="card-title">📱 홈스크린 추가 (PWA)</div>
@@ -1638,7 +1637,15 @@ let calFilterSky  = null;
 let calFilterDidi = null;
 let calSelectedDs = null;
 
-function initCal() { const n=new Date(); calYear=n.getFullYear(); calMonth=n.getMonth(); }
+function initCal() {
+  const schedule = getSchedule();
+  const today = localDate();
+  // 오늘 이후 스케줄이 있으면 첫 회차 기준, 없으면 현재 월
+  const upcoming = schedule.filter(s => s.date >= today).sort((a,b) => a.date.localeCompare(b.date));
+  const base = upcoming.length ? upcoming[0].date : (schedule.length ? schedule[0].date : today);
+  calYear  = parseInt(base.slice(0,4));
+  calMonth = parseInt(base.slice(5,7)) - 1;
+}
 function calPrev() { calMonth--; if(calMonth<0){calMonth=11;calYear--;} calSelectedDs=null; renderCalendar(); }
 function calNext() { calMonth++; if(calMonth>11){calMonth=0;calYear++;} calSelectedDs=null; renderCalendar(); }
 
