@@ -1382,7 +1382,7 @@ const MAX_RIGHT = 10;
 
 function buildMiniSeat(zone, _row, num) {
   const rowKeys = ['A','B','C','D',null,'E','F','G','H','I','J','K','L']; // null = aisle
-  let html = '<div style="overflow-x:auto;margin:8px 0;"><div style="display:flex;flex-direction:column;gap:2px;width:max-content;">';
+  let html = '<div style="overflow-x:auto;margin:8px 0;display:flex;justify-content:center;"><div style="display:flex;flex-direction:column;gap:2px;width:max-content;">';
   rowKeys.forEach(r => {
     if (r === null) {
       html += '<div style="height:4px;"></div>'; // aisle gap between D and E
