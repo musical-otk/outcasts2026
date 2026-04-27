@@ -1,4 +1,4 @@
-const CACHE_NAME = 'outcasts2026-v1';
+const CACHE_NAME = 'outcasts2026-v2';
 const BASE = '/outcasts2026';
 
 // 앱 시작 시 캐시할 파일들
@@ -6,6 +6,8 @@ const PRECACHE_URLS = [
   BASE + '/',
   BASE + '/index.html',
   BASE + '/manifest.json',
+  BASE + '/icon-192.png',
+  BASE + '/icon-512.png',
 ];
 
 // install: 기본 파일 캐시
