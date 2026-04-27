@@ -1382,7 +1382,7 @@ const MAX_RIGHT = 10;
 
 function buildMiniSeat(zone, _row, num) {
   const rowKeys = ['A','B','C','D',null,'E','F','G','H','I','J','K','L']; // null = aisle
-  let html = '<div style="overflow-x:auto;margin:8px 0;"><div style="display:flex;flex-direction:column;gap:1px;width:max-content;">';
+  let html = '<div style="overflow-x:auto;margin:8px 0;"><div style="display:flex;flex-direction:column;gap:2px;width:max-content;">';
   rowKeys.forEach(r => {
     if (r === null) {
       html += '<div style="height:4px;"></div>'; // aisle gap between D and E
@@ -1390,23 +1390,23 @@ function buildMiniSeat(zone, _row, num) {
     }
     const cfg = SEAT_ROWS[r];
     const isTargetRow = r === zone;
-    html += '<div style="display:flex;gap:1px;align-items:center;">';
+    html += '<div style="display:flex;gap:2px;align-items:center;">';
     // left padding
-    for (let i = 0; i < MAX_LEFT - cfg.left; i++) html += '<div style="width:6px;height:6px;visibility:hidden;flex-shrink:0;"></div>';
+    for (let i = 0; i < MAX_LEFT - cfg.left; i++) html += '<div style="width:10px;height:10px;visibility:hidden;flex-shrink:0;"></div>';
     // left seats
     for (let n = cfg.lStart; n < cfg.lStart + cfg.left; n++) {
       const hl = isTargetRow && n === parseInt(num);
-      html += `<div style="width:6px;height:6px;border-radius:1px;flex-shrink:0;background:${hl ? 'var(--accent)' : 'var(--bg3)'};border:1px solid ${hl ? 'var(--accent)' : 'var(--border)'};"></div>`;
+      html += `<div style="width:10px;height:10px;border-radius:2px;flex-shrink:0;background:${hl ? 'var(--accent)' : 'var(--bg3)'};border:1px solid ${hl ? 'var(--accent)' : 'var(--border)'};${hl ? 'box-shadow:0 0 4px var(--accent);' : ''}"></div>`;
     }
     // row label
-    html += `<div style="width:16px;font-size:7px;color:${isTargetRow?'var(--accent)':'var(--text3)'};text-align:center;font-weight:${isTargetRow?'700':'400'};flex-shrink:0;">${r}</div>`;
+    html += `<div style="width:18px;font-size:9px;color:${isTargetRow?'var(--accent)':'var(--text3)'};text-align:center;font-weight:${isTargetRow?'700':'400'};flex-shrink:0;">${r}</div>`;
     // right seats
     for (let n = cfg.rStart; n < cfg.rStart + cfg.right; n++) {
       const hl = isTargetRow && n === parseInt(num);
-      html += `<div style="width:6px;height:6px;border-radius:1px;flex-shrink:0;background:${hl ? 'var(--accent)' : 'var(--bg3)'};border:1px solid ${hl ? 'var(--accent)' : 'var(--border)'};"></div>`;
+      html += `<div style="width:10px;height:10px;border-radius:2px;flex-shrink:0;background:${hl ? 'var(--accent)' : 'var(--bg3)'};border:1px solid ${hl ? 'var(--accent)' : 'var(--border)'};${hl ? 'box-shadow:0 0 4px var(--accent);' : ''}"></div>`;
     }
     // right padding
-    for (let i = 0; i < MAX_RIGHT - cfg.right; i++) html += '<div style="width:6px;height:6px;visibility:hidden;flex-shrink:0;"></div>';
+    for (let i = 0; i < MAX_RIGHT - cfg.right; i++) html += '<div style="width:10px;height:10px;visibility:hidden;flex-shrink:0;"></div>';
     html += '</div>';
   });
   return html + '</div></div>';
