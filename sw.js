@@ -1,4 +1,4 @@
-const CACHE_NAME = 'outcasts2026-v4';
+const CACHE_NAME = 'outcasts2026-v5';
 const BASE = '/outcasts2026';
 
 // 앱 시작 시 캐시할 파일들
