@@ -710,6 +710,12 @@
         <button type="button" class="btn btn-outline btn-sm" style="width:100%;" onclick="openAddStampBoardFromRecord()">+ 새 도장판 만들기</button>
       </div>
       <div id="rec-stamp-qty-group" style="display:none;margin-top:10px;">
+        <div id="rec-double-stamp-group" style="display:none;margin-bottom:8px;">
+          <label style="display:flex;align-items:center;gap:10px;background:var(--accent-light);border-radius:8px;padding:10px 12px;cursor:pointer;">
+            <input type="checkbox" id="rec-use-double-stamp" onchange="onRecDoubleStampCheck(this)">
+            <span style="font-size:13px;color:var(--accent2);font-weight:600;">🎫 더블 적립권 사용 <span id="rec-double-stamp-avail" style="color:var(--text3);font-weight:400;"></span></span>
+          </label>
+        </div>
         <label class="form-label">도장 수량</label>
         <div style="display:flex;gap:8px;">
           <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:7px;border:1.5px solid var(--accent);border-radius:8px;cursor:pointer;font-size:13px;color:var(--accent);font-weight:700;" id="rec-qty-label-1">
@@ -1192,6 +1198,10 @@ function openAddRecord(date) {
   document.getElementById('rec-unconfirmed').checked = false; // default: confirmed (isBooked=true)
   populateStampSelect();
   document.getElementById('rec-stamp-board').value = '';
+  const recDsCb = document.getElementById('rec-use-double-stamp');
+  if (recDsCb) recDsCb.checked = false;
+  const recDsGrp = document.getElementById('rec-double-stamp-group');
+  if (recDsGrp) recDsGrp.style.display = 'none';
   resetStars();
   if (date) autoFillCasting();
   openPanel('overlay-record');
@@ -1275,8 +1285,9 @@ function saveRecord() {
     seatNumber:   numVal!=='' ? parseInt(numVal) : null,
     price:        priceVal!=='' ? parseInt(priceVal) : null,
     discountType: discountType,
-    stampBoardId: stampBoardId || null,
-    stampQty:     stampBoardId ? stampQty : null,
+    stampBoardId:     stampBoardId || null,
+    stampQty:         stampBoardId ? stampQty : null,
+    usedDoubleStamp:  stampBoardId && document.getElementById('rec-use-double-stamp')?.checked ? true : false,
     rating:       currentStar,
     comment:      document.getElementById('rec-comment').value.trim(),
     memo:         document.getElementById('rec-memo').value.trim(),
@@ -1350,20 +1361,79 @@ function saveRecord() {
   } else {
     records.push(record);
     if (stampBoardId) {
-      const toastMsg = applyStampToBoard(stampBoardId, stampQty, date, `${alex} · ${philo} 관람 연동`);
-      // 방금 추가된 history에 recordId 심기 (수정 시 정확한 삭제를 위해)
+      const recDsCheck = document.getElementById('rec-use-double-stamp');
+      const useDouble  = recDsCheck && recDsCheck.checked;
+      // 더블 적립 overflow 체크: 남은 칸이 1칸인데 2개 찍으려는 경우
+      let overflowNewBoardId = null;
+      if (useDouble && stampQty === 2) {
+        const boardsNow = getStampBoards();
+        const boardNow  = boardsNow.find(b => b.id === stampBoardId);
+        if (boardNow) {
+          recalcStampCount(boardNow);
+          const remaining = boardNow.totalSlots - boardNow.currentCount;
+          if (remaining === 1) {
+            if (!confirm('현재 도장판이 완료됩니다.\n새 도장판에 첫 번째 도장을 찍겠습니다.\n계속하시겠습니까?')) {
+              // 취소: 체크박스 해제, qty 1로 되돌리기
+              recDsCheck.checked = false;
+              const qty1 = document.querySelector('input[name="rec-stamp-qty"][value="1"]');
+              if (qty1) { qty1.checked = true; updateRecQtyLabel(); }
+              records.pop();
+              return;
+            }
+            // 새 도장판 자동 생성
+            const allBoards = getStampBoards();
+            const maxNum = allBoards.reduce((max, b) => { const n = parseInt(b.name); return (!isNaN(n) && n > max) ? n : max; }, 0);
+            const newBoard = {
+              id: uuid(), name: String(maxNum + 1), totalSlots: 7,
+              reward: '미니CD + 포토북',
+              milestones: [
+                { at:3, reward:'40% 할인권 ×2', couponKey:'discount40', qty:2, notified:false },
+                { at:5, reward:'📸 폴라로이드',   couponKey:null,          notified:false },
+                { at:7, reward:'50% 할인권 + 미니CD + 포토북', couponKey:'discount50', qty:1, notified:false }
+              ],
+              currentCount: 0, history: []
+            };
+            allBoards.push(newBoard);
+            saveStampBoards(allBoards);
+            overflowNewBoardId = newBoard.id;
+          }
+        }
+      }
+      // 현재 도장판에 찍기 (overflow 시엔 1개만)
+      const applyQty = overflowNewBoardId ? 1 : stampQty;
+      const toastMsg = applyStampToBoard(stampBoardId, applyQty, date, `${alex} · ${philo} 관람 연동`);
       const boards2 = getStampBoards();
       const board2  = boards2.find(b => b.id === stampBoardId);
       if (board2 && board2.history && board2.history.length) {
         board2.history[board2.history.length - 1].recordId = record.id;
         saveStampBoards(boards2);
       }
-      showToast(toastMsg || '기록이 추가되었습니다');
+      // 새 도장판 overflow 찍기
+      if (overflowNewBoardId) {
+        applyStampToBoard(overflowNewBoardId, 1, date, `${alex} · ${philo} 관람 연동 (더블 적립 이월)`);
+        const boards3 = getStampBoards();
+        const board3  = boards3.find(b => b.id === overflowNewBoardId);
+        if (board3 && board3.history && board3.history.length) {
+          board3.history[board3.history.length - 1].recordId = record.id;
+          saveStampBoards(boards3);
+        }
+        showToast('도장판 완성! 새 도장판에 1개 추가됨');
+      } else {
+        showToast(toastMsg || '기록이 추가되었습니다');
+      }
     } else {
       showToast('기록이 추가되었습니다');
     }
   }
   saveRecords(records);
+  // 더블 적립권 사용 시 차감
+  const recDsCheck2 = document.getElementById('rec-use-double-stamp');
+  if (recDsCheck2 && recDsCheck2.checked && stampBoardId) {
+    const coupons = getCoupons();
+    if (!coupons.doubleStamp) coupons.doubleStamp = { count: 0, history: [] };
+    coupons.doubleStamp.history.push({ type:'사용', date, comment: '더블 적립권 사용', qty: 1 });
+    saveCoupons(coupons);
+  }
   closePanel('overlay-record');
   refreshCurrentPage();
 }
@@ -1493,6 +1563,13 @@ function deleteCurrentRecord() {
       }
     });
     if (stampChanged) saveStampBoards(boards);
+    // 더블 적립권 복원
+    if (target.usedDoubleStamp) {
+      const coupons = getCoupons();
+      if (!coupons.doubleStamp) coupons.doubleStamp = { count: 0, history: [] };
+      coupons.doubleStamp.history.push({ type:'복원', date: target.date, comment: '기록 삭제로 복원', qty: 1 });
+      saveCoupons(coupons);
+    }
   }
   saveRecords(records.filter(x => x.id !== currentDetailId));
   closePanel('overlay-detail');
@@ -1601,7 +1678,7 @@ function renderHome() {
         const actualPct    = Math.min(100, Math.round(cur   / b.totalSlots * 100));
         const done = cur >= b.totalSlots;
         return `<div class="home-stamp-row">
-          <div class="home-stamp-name">[📡 ${b.name}]${done?' 🎉':''}</div>
+          <div class="home-stamp-name">[🎫 ${b.name}]${done?' 🎉':''}</div>
           <div class="home-stamp-bar">
             <div class="home-stamp-bar-fill scheduled" style="width:${scheduledPct}%"></div>
             <div class="home-stamp-bar-fill actual"    style="width:${actualPct}%"></div>
@@ -2758,7 +2835,29 @@ function onRecStampBoardChange() {
   if (!val) {
     const r1 = document.querySelector('input[name="rec-stamp-qty"][value="1"]');
     if (r1) { r1.checked = true; updateRecQtyLabel(); }
+    const dsCheck = document.getElementById('rec-use-double-stamp');
+    if (dsCheck) dsCheck.checked = false;
   }
+  // 더블 적립권 체크박스 표시
+  if (val) {
+    const coupons = getCoupons();
+    if (!coupons.doubleStamp) coupons.doubleStamp = { count: 0, history: [] };
+    const dsCnt = calcCouponCount('doubleStamp', coupons, getStampBoards(), getRecords());
+    const dsGroup = document.getElementById('rec-double-stamp-group');
+    const dsAvail = document.getElementById('rec-double-stamp-avail');
+    if (dsGroup) dsGroup.style.display = dsCnt > 0 ? '' : 'none';
+    if (dsAvail) dsAvail.textContent = `(보유 ${dsCnt}장)`;
+  } else {
+    const dsGroup = document.getElementById('rec-double-stamp-group');
+    if (dsGroup) dsGroup.style.display = 'none';
+  }
+}
+
+function onRecDoubleStampCheck(cb) {
+  const qty2 = document.querySelector('input[name="rec-stamp-qty"][value="2"]');
+  const qty1 = document.querySelector('input[name="rec-stamp-qty"][value="1"]');
+  if (cb.checked) { if (qty2) { qty2.checked = true; updateRecQtyLabel(); } }
+  else            { if (qty1) { qty1.checked = true; updateRecQtyLabel(); } }
 }
 
 function updateRecQtyLabel() {
@@ -2909,7 +3008,7 @@ function renderCouponAllHistory() {
   allCouponItems.forEach(item => {
     if (!coupons[item.key]) return;
     (coupons[item.key].history || []).forEach((h, idx) => {
-      if (h.type === '복원') return;
+      if (h.type === '복원' && h.comment !== '기록 삭제로 복원') return;
       if (h.comment && (h.comment.includes('달성 보상') || h.comment.includes('칸 달성'))) return;
       if (h.type === '사용' && h.comment && h.comment.includes('관람 사용')) return;
       allRows.push({ ...h, key: item.key, short: item.short, originalIdx: idx, rowType: 'manual' });
@@ -2958,10 +3057,11 @@ function renderCouponAllHistory() {
   const rows = allRows.map(h => {
     const d = new Date(h.date + 'T00:00:00');
     const dateStr = `${parseInt(h.date.slice(5,7))}.${parseInt(h.date.slice(8,10))}(${dow[d.getDay()]})`;
-    const isGet = h.type === '획득';
-    const typeHtml = isGet
-      ? `<span class="hist-type-get">획득</span>`
-      : `<span class="hist-type-use">사용</span>`;
+    const isGet = h.type === '획득' || h.type === '복원';
+    const typeHtml = h.type === '복원'
+      ? `<span class="hist-type-get" style="opacity:0.7;">복원</span>`
+      : isGet ? `<span class="hist-type-get">획득</span>`
+              : `<span class="hist-type-use">사용</span>`;
     const qty   = h.qty || 1;
     const delta = isGet ? `<span class="hist-delta-pos">+${qty}</span>` : `<span class="hist-delta-neg">-${qty}</span>`;
     const d40     = h.key === 'discount40'   ? delta : '';
@@ -3157,7 +3257,7 @@ function migrateData() {
     if (!coupons[key]?.history) return;
     const before = coupons[key].history.length;
     coupons[key].history = coupons[key].history.filter(h => {
-      if (h.type === '복원') return false;
+      if (h.type === '복원' && h.comment !== '기록 삭제로 복원') return false;
       if (h.comment && (h.comment.includes('달성 보상') || h.comment.includes('칸 달성'))) return false;
       // 관람 연동으로 자동 생성된 사용 항목 (예: "고상호×이한솔 관람 사용")
       if (h.type === '사용' && h.comment && h.comment.includes('관람 사용')) return false;
