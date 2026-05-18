@@ -3115,7 +3115,7 @@ function saveCouponPack() {
   const comment = document.getElementById('coupon-pack-comment').value.trim();
   if (!date) { showToast('날짜를 입력해주세요'); return; }
   const coupons = getCoupons();
-  ['discount40','discount50','discountPass','doubleStamp'].forEach(key => {
+  ['discount40','discountPass','doubleStamp'].forEach(key => {
     if (!coupons[key]) coupons[key] = { count: 0, history: [] };
     if (!coupons[key].history) coupons[key].history = [];
     coupons[key].history.push({ type:'획득', date, comment: comment || '쿠폰팩 획득', qty: 1 });
