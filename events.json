@@ -3,60 +3,60 @@
     "name": "프리뷰",
     "startDate": "2026-05-07",
     "endDate": "2026-05-10",
-    "color": "#4CAF50"
+    "color": "#A8D5A2"
   },
   {
     "name": "포토카드 증정",
     "startDate": "2026-05-12",
     "endDate": "2026-05-17",
-    "color": "#FF9800"
+    "color": "#FFCC99"
   },
   {
     "name": "쿠폰팩 증정",
     "startDate": "2026-05-19",
     "endDate": "2026-05-24",
-    "color": "#9C27B0"
+    "color": "#C9A8E0"
   },
   {
     "name": "스페셜 커튼콜",
     "startDate": "2026-05-25",
     "endDate": "2026-05-25",
-    "color": "#E91E63"
+    "color": "#F4A7B9"
   },
   {
     "name": "스페셜 커튼콜",
     "startDate": "2026-05-27",
     "endDate": "2026-05-31",
-    "color": "#E91E63"
+    "color": "#F4A7B9"
   },
   {
     "name": "더블 적립",
     "startDate": "2026-06-02",
     "endDate": "2026-06-07",
-    "color": "#2196F3"
+    "color": "#A3C4F3"
   },
   {
     "name": "포토카드 증정",
     "startDate": "2026-06-09",
     "endDate": "2026-06-14",
-    "color": "#FF9800"
+    "color": "#FFCC99"
   },
   {
     "name": "스페셜 커튼콜",
     "startDate": "2026-06-16",
     "endDate": "2026-06-21",
-    "color": "#E91E63"
+    "color": "#F4A7B9"
   },
   {
     "name": "더블 적립",
     "startDate": "2026-06-23",
     "endDate": "2026-06-28",
-    "color": "#2196F3"
+    "color": "#A3C4F3"
   },
   {
     "name": "럭키드로우",
     "startDate": "2026-06-30",
     "endDate": "2026-07-05",
-    "color": "#FF5722"
+    "color": "#FFB499"
   }
 ]
